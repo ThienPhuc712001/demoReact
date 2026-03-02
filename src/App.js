@@ -1,152 +1,141 @@
 import React, { useState } from "react";
-import "./App.css";
+import {
+  Button,
+  Input,
+  Table,
+  Space,
+  Popconfirm,
+  Card,
+  message,
+  Form,
+  InputNumber,
+} from "antd";
 
 function App() {
+  const [form] = Form.useForm();
+
   const [employees, setEmployees] = useState([
     { id: 1, name: "Nguyễn Văn A", age: 25, position: "Developer" },
     { id: 2, name: "Trần Thị B", age: 28, position: "Tester" },
   ]);
 
-  const [formData, setFormData] = useState({
-    id: null,
-    name: "",
-    age: "",
-    position: "",
-  });
-
   const [isEditing, setIsEditing] = useState(false);
+  const [editingId, setEditingId] = useState(null);
 
-  // Handle input change
-  const handleChange = (e) => {
-  const { name, value } = e.target;
+  const onFinish = (values) => {
+    if (isEditing) {
+      setEmployees(
+        employees.map((emp) =>
+          emp.id === editingId ? { ...values, id: editingId } : emp
+        )
+      );
+      message.success("Cập nhật thành công!");
+    } else {
+      const maxId =
+        employees.length > 0
+          ? Math.max(...employees.map((emp) => emp.id))
+          : 0;
 
-  if (name === "age") {
-    if (value < 0) return; // không cho nhập số âm
-  }
-
-  setFormData({
-    ...formData,
-    [name]: value,
-  });
-};
-
-  // Add employee
-  const handleAdd = () => {
-  if (!formData.name || !formData.age || !formData.position) {
-    alert("Vui lòng nhập đầy đủ thông tin!");
-    return;
-  }
-
-  const maxId =
-    employees.length > 0
-      ? Math.max(...employees.map((emp) => emp.id))
-      : 0;
-
-  const newEmployee = {
-    id: maxId + 1,
-    name: formData.name,
-    age: Number(formData.age),
-    position: formData.position,
-  };
-
-  setEmployees([...employees, newEmployee]);
-  resetForm();
-};
-
-  // Delete employee
-  const handleDelete = (id) => {
-    const confirmDelete = window.confirm("Bạn có chắc muốn xóa?");
-    if (confirmDelete) {
-      setEmployees(employees.filter((emp) => emp.id !== id));
+      setEmployees([...employees, { ...values, id: maxId + 1 }]);
+      message.success("Thêm nhân viên thành công!");
     }
-  };
 
-  // Edit employee
-  const handleEdit = (employee) => {
-    setFormData(employee);
-    setIsEditing(true);
-  };
-
-  // Update employee
-  const handleUpdate = () => {
-    setEmployees(
-      employees.map((emp) =>
-        emp.id === formData.id ? formData : emp
-      )
-    );
-    resetForm();
+    form.resetFields();
     setIsEditing(false);
   };
 
-  const resetForm = () => {
-    setFormData({
-      id: null,
-      name: "",
-      age: "",
-      position: "",
-    });
+  const handleDelete = (id) => {
+    setEmployees(employees.filter((emp) => emp.id !== id));
+    message.success("Đã xóa!");
   };
 
+  const handleEdit = (record) => {
+    form.setFieldsValue(record);
+    setEditingId(record.id);
+    setIsEditing(true);
+  };
+
+  const columns = [
+    { title: "ID", dataIndex: "id" },
+    { title: "Tên", dataIndex: "name" },
+    { title: "Tuổi", dataIndex: "age" },
+    { title: "Chức vụ", dataIndex: "position" },
+    {
+      title: "Hành động",
+      render: (_, record) => (
+        <Space>
+          <Button type="primary" onClick={() => handleEdit(record)}>
+            Sửa
+          </Button>
+          <Popconfirm
+            title="Bạn có chắc muốn xóa?"
+            onConfirm={() => handleDelete(record.id)}
+          >
+            <Button danger>Xóa</Button>
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ];
+
   return (
-    <div style={{ padding: "30px" }}>
-      <h2>Quản Lý Nhân Viên (React Demo)</h2>
-    
-      <div style={{ marginBottom: "20px" }}>
-        <input
-          type="text"
+    <Card title="Quản Lý Nhân Viên (Ant Design)" style={{ margin: 30 }}>
+      <Form
+        form={form}
+        layout="inline"
+        onFinish={onFinish}
+        style={{ marginBottom: 20 }}
+      >
+        {/* NAME */}
+        <Form.Item
           name="name"
-          placeholder="Tên"
-          value={formData.name}
-          onChange={handleChange}
-        />
-        <input
-          type="number"
+          rules={[
+            { required: true, message: "Vui lòng nhập tên!" },
+            {
+              pattern: /^[A-Za-zÀ-ỹ\s]+$/,
+              message: "Tên không được chứa số hoặc ký tự đặc biệt!",
+            },
+          ]}
+        >
+          <Input placeholder="Tên" />
+        </Form.Item>
+
+        {/* AGE */}
+        <Form.Item
           name="age"
-          placeholder="Tuổi"
-          value={formData.age}
-          onChange={handleChange}
-        />
-        <input
-          type="text"
+          rules={[
+            { required: true, message: "Vui lòng nhập tuổi!" },
+            {
+              type: "number",
+              min: 1,
+              max: 100,
+              message: "Tuổi phải từ 1 đến 100!",
+            },
+          ]}
+        >
+          <InputNumber placeholder="Tuổi" />
+        </Form.Item>
+
+        {/* POSITION */}
+        <Form.Item
           name="position"
-          placeholder="Chức vụ"
-          value={formData.position}
-          onChange={handleChange}
-        />
+          rules={[
+            { required: true, message: "Vui lòng nhập chức vụ!" },
+            { min: 2, message: "Chức vụ phải ít nhất 2 ký tự!" },
+          ]}
+        >
+          <Input placeholder="Chức vụ" />
+        </Form.Item>
 
-        {isEditing ? (
-          <button onClick={handleUpdate}>Cập nhật</button>
-        ) : (
-          <button onClick={handleAdd}>Thêm</button>
-        )}
-      </div>
+        <Form.Item>
+          <Button type="primary" htmlType="submit">
+            {isEditing ? "Cập nhật" : "Thêm"}
+          </Button>
+        </Form.Item>
+      </Form>
 
-      <table border="1" cellPadding="10">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Tên</th>
-            <th>Tuổi</th>
-            <th>Chức vụ</th>
-            <th>Hành động</th>
-          </tr>
-        </thead>
-        <tbody>
-          {employees.map((emp) => (
-            <tr key={emp.id}>
-              <td>{emp.id}</td>
-              <td>{emp.name}</td>
-              <td>{emp.age}</td>
-              <td>{emp.position}</td>
-              <td>
-                <button onClick={() => handleEdit(emp)}>Sửa</button>
-                <button onClick={() => handleDelete(emp.id)}>Xóa</button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+      <Table dataSource={employees} columns={columns} rowKey="id" />
+    </Card>
   );
 }
 
