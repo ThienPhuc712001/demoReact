@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Button,
   Input,
@@ -10,79 +10,102 @@ import {
   Form,
   InputNumber,
 } from "antd";
+import { employeeService } from "./services/api";
 
-function App() {
+const EmployeeManagement = React.memo(() => {
   const [form] = Form.useForm();
-
-  const [employees, setEmployees] = useState([
-    { id: 1, name: "Nguyễn Văn A", age: 25, position: "Developer" },
-    { id: 2, name: "Trần Thị B", age: 28, position: "Tester" },
-  ]);
-
+  const [employees, setEmployees] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState(null);
 
-  const onFinish = (values) => {
-    if (isEditing) {
-      setEmployees(
-        employees.map((emp) =>
-          emp.id === editingId ? { ...values, id: editingId } : emp
-        )
-      );
-      message.success("Cập nhật thành công!");
-    } else {
-      const maxId =
-        employees.length > 0
-          ? Math.max(...employees.map((emp) => emp.id))
-          : 0;
+  // Fetch employees on component mount
+  useEffect(() => {
+    fetchEmployees();
+  }, []);
 
-      setEmployees([...employees, { ...values, id: maxId + 1 }]);
-      message.success("Thêm nhân viên thành công!");
+  const fetchEmployees = useCallback(async () => {
+    try {
+      setLoading(true);
+      const data = await employeeService.getAllEmployees();
+      setEmployees(data);
+    } catch (error) {
+      message.error("Không thể tải danh sách nhân viên!");
+      console.error("Error fetching employees:", error);
+    } finally {
+      setLoading(false);
     }
+  }, []);
 
-    form.resetFields();
-    setIsEditing(false);
-  };
+  const onFinish = useCallback(async (values) => {
+    try {
+      if (isEditing) {
+        await employeeService.updateEmployee(editingId, values);
+        message.success("Cập nhật thành công!");
+      } else {
+        await employeeService.createEmployee(values);
+        message.success("Thêm nhân viên thành công!");
+      }
 
-  const handleDelete = (id) => {
-    setEmployees(employees.filter((emp) => emp.id !== id));
-    message.success("Đã xóa!");
-  };
+      form.resetFields();
+      setIsEditing(false);
+      setEditingId(null);
+      fetchEmployees(); // Refresh the list
+    } catch (error) {
+      message.error(isEditing ? "Cập nhật thất bại!" : "Thêm nhân viên thất bại!");
+      console.error("Error:", error);
+    }
+  }, [isEditing, editingId, form, fetchEmployees]);
 
-  const handleEdit = (record) => {
+  const handleDelete = useCallback(async (id) => {
+    try {
+      await employeeService.deleteEmployee(id);
+      message.success("Đã xóa!");
+      fetchEmployees(); // Refresh the list
+    } catch (error) {
+      message.error("Xóa thất bại!");
+      console.error("Error deleting employee:", error);
+    }
+  }, [fetchEmployees]);
+
+  const handleEdit = useCallback((record) => {
     form.setFieldsValue(record);
     setEditingId(record.id);
     setIsEditing(true);
-  };
+  }, [form]);
 
-  const columns = [
-    { title: "ID", dataIndex: "id" },
-    { title: "Tên", dataIndex: "name" },
-    { title: "Tuổi", dataIndex: "age" },
-    { title: "Chức vụ", dataIndex: "position" },
+  const ActionButtons = React.memo(({ record }) => (
+    <Space>
+      <Button type="primary" onClick={() => handleEdit(record)}>
+        Sửa
+      </Button>
+      <Popconfirm
+        title="Bạn có chắc muốn xóa?"
+        onConfirm={() => handleDelete(record.id)}
+      >
+        <Button danger>Xóa</Button>
+      </Popconfirm>
+    </Space>
+  ));
+
+  const columns = useMemo(() => [
+    { title: "ID", dataIndex: "id", key: "id" },
+    { title: "Tên", dataIndex: "name", key: "name" },
+    { title: "Tuổi", dataIndex: "age", key: "age" },
+    { title: "Chức vụ", dataIndex: "position", key: "position" },
     {
       title: "Hành động",
-      render: (_, record) => (
-        <Space>
-          <Button type="primary" onClick={() => handleEdit(record)}>
-            Sửa
-          </Button>
-          <Popconfirm
-            title="Bạn có chắc muốn xóa?"
-            onConfirm={() => handleDelete(record.id)}
-          >
-            <Button danger>Xóa</Button>
-          </Popconfirm>
-        </Space>
-      ),
+      key: "actions",
+      render: (_, record) => <ActionButtons record={record} />,
     },
-  ];
+  ], [handleEdit, handleDelete]);
 
   return (
-    <Card title="Quản Lý Nhân Viên (Ant Design)" style={{ margin: 30 }}>
+    <Card title="Quản Lý Nhân Viên" style={{ margin: 30 }}>
       <Form
         form={form}
         layout="inline"
+        autoComplete="off"
         onFinish={onFinish}
         style={{ marginBottom: 20 }}
       >
@@ -97,7 +120,7 @@ function App() {
             },
           ]}
         >
-          <Input placeholder="Tên" />
+          <Input placeholder="Tên" autoComplete="name" />
         </Form.Item>
 
         {/* AGE */}
@@ -113,7 +136,7 @@ function App() {
             },
           ]}
         >
-          <InputNumber placeholder="Tuổi" />
+          <InputNumber placeholder="Tuổi" autoComplete="off" />
         </Form.Item>
 
         {/* POSITION */}
@@ -124,7 +147,7 @@ function App() {
             { min: 2, message: "Chức vụ phải ít nhất 2 ký tự!" },
           ]}
         >
-          <Input placeholder="Chức vụ" />
+          <Input placeholder="Chức vụ" autoComplete="off" />
         </Form.Item>
 
         <Form.Item>
@@ -134,9 +157,16 @@ function App() {
         </Form.Item>
       </Form>
 
-      <Table dataSource={employees} columns={columns} rowKey="id" />
+      <Table
+        dataSource={employees}
+        columns={columns}
+        rowKey="id"
+        loading={loading}
+        pagination={{ pageSize: 10 }}
+        scroll={{ x: true }}
+      />
     </Card>
   );
-}
+});
 
-export default App;
+export default EmployeeManagement;

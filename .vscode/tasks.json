@@ -1,0 +1,13 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Free port 5000",
+      "type": "shell",
+      "command": "node",
+      "args": ["scripts/free-port.js", "5000"],
+      "problemMatcher": []
+    }
+  ]
+}
+
