@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const { sql, connectToDB } = require('./config/db');
+const WebSocket = require('ws');
 
 const app = express();
 const PORT = process.env.SERVER_PORT || 5000;
@@ -87,6 +88,13 @@ app.post('/api/employees', validateEmployee, async (req, res) => {
       OUTPUT INSERTED.id, INSERTED.name, INSERTED.age, INSERTED.position
       VALUES (${name.trim()}, ${parseInt(age)}, ${position.trim()})
     `;
+    
+    // Broadcast WebSocket event
+    broadcast({
+      type: 'employee_created',
+      data: result.recordset[0]
+    });
+    
     res.status(201).json(result.recordset[0]);
   } catch (err) {
     console.error('Error creating employee:', err);
@@ -104,21 +112,36 @@ app.put('/api/employees/:id', validateEmployee, async (req, res) => {
     if (isNaN(id)) {
       return res.status(400).json({ error: 'Invalid employee ID' });
     }
-    
+
     const { name, age, position } = req.body;
-    
-    const result = await sql.query`
+
+    // Update without OUTPUT clause (to work with triggers)
+    const updateResult = await sql.query`
       UPDATE Employees
       SET name = ${name.trim()}, age = ${parseInt(age)}, position = ${position.trim()}
-      OUTPUT INSERTED.id, INSERTED.name, INSERTED.age, INSERTED.position
       WHERE id = ${id}
     `;
-    
-    if (result.recordset.length === 0) {
+
+    if (updateResult.rowsAffected[0] === 0) {
       return res.status(404).json({ error: 'Employee not found' });
     }
-    
-    res.json(result.recordset[0]);
+
+    // Fetch updated employee data
+    const result = await sql.query`
+      SELECT id, name, age, position
+      FROM Employees
+      WHERE id = ${id}
+    `;
+
+    const updatedEmployee = result.recordset[0];
+
+    // Broadcast WebSocket event
+    broadcast({
+      type: 'employee_updated',
+      data: updatedEmployee
+    });
+
+    res.json(updatedEmployee);
   } catch (err) {
     console.error('Error updating employee:', err);
     res.status(500).json({ error: 'Failed to update employee' });
@@ -141,6 +164,12 @@ app.delete('/api/employees/:id', async (req, res) => {
     if (result.recordset.length === 0) {
       return res.status(404).json({ error: 'Employee not found' });
     }
+    
+    // Broadcast WebSocket event
+    broadcast({
+      type: 'employee_deleted',
+      data: { id: result.recordset[0].id }
+    });
     
     res.json({ message: 'Employee deleted successfully' });
   } catch (err) {
@@ -168,6 +197,47 @@ app.use((err, req, res, next) => {
 const server = app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
+
+// WebSocket Server setup
+const wss = new WebSocket.Server({ server });
+
+// Store all connected clients
+const clients = new Set();
+
+wss.on('connection', (ws) => {
+  console.log('New WebSocket client connected');
+  clients.add(ws);
+  
+  // Send welcome message to new client
+  ws.send(JSON.stringify({ type: 'connection', message: 'Connected to employee management WebSocket' }));
+  
+  // Handle incoming messages
+  ws.on('message', (message) => {
+    console.log('Received:', message);
+  });
+  
+  // Handle client disconnection
+  ws.on('close', () => {
+    console.log('WebSocket client disconnected');
+    clients.delete(ws);
+  });
+  
+  // Handle errors
+  ws.on('error', (error) => {
+    console.error('WebSocket error:', error);
+    clients.delete(ws);
+  });
+});
+
+// Function to broadcast message to all connected clients
+const broadcast = (message) => {
+  const data = JSON.stringify(message);
+  clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(data);
+    }
+  });
+};
 
 server.on('error', (err) => {
   console.error('Server error:', err);

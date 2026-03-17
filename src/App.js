@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useEffect, useCallback, useMemo } from "react";
+import { useSelector, useDispatch } from "react-redux";
 import {
   Button,
   Input,
@@ -10,69 +11,75 @@ import {
   Form,
   InputNumber,
 } from "antd";
-import { employeeService } from "./services/api";
+import {
+  fetchEmployeesRequest,
+  createEmployeeRequest,
+  updateEmployeeRequest,
+  deleteEmployeeRequest,
+  setEditingEmployee,
+  clearEditingEmployee,
+  websocketConnect,
+  websocketDisconnect
+} from "./store/actions";
+import websocketService from "./services/websocket";
 
 const EmployeeManagement = React.memo(() => {
   const [form] = Form.useForm();
-  const [employees, setEmployees] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editingId, setEditingId] = useState(null);
+  const dispatch = useDispatch();
+  
+  // Get state from Redux store
+  const { employees, loading, isEditing, editingEmployee } = useSelector(state => state.employee);
 
-  // Fetch employees on component mount
+  // Fetch employees on component mount and setup WebSocket
   useEffect(() => {
-    fetchEmployees();
-  }, []);
+    dispatch(fetchEmployeesRequest());
+    dispatch(websocketConnect());
+    
+    // Subscribe to WebSocket events
+    const unsubscribeCreated = websocketService.subscribe('employee_created', (data) => {
+      message.success('Nhân viên mới đã được thêm!');
+    });
+    
+    const unsubscribeUpdated = websocketService.subscribe('employee_updated', (data) => {
+      message.success('Thông tin nhân viên đã được cập nhật!');
+    });
+    
+    const unsubscribeDeleted = websocketService.subscribe('employee_deleted', (data) => {
+      message.success('Nhân viên đã được xóa!');
+    });
+    
+    // Cleanup on unmount
+    return () => {
+      unsubscribeCreated();
+      unsubscribeUpdated();
+      unsubscribeDeleted();
+      dispatch(websocketDisconnect());
+    };
+  }, [dispatch]);
 
-  const fetchEmployees = useCallback(async () => {
-    try {
-      setLoading(true);
-      const data = await employeeService.getAllEmployees();
-      setEmployees(data);
-    } catch (error) {
-      message.error("Không thể tải danh sách nhân viên!");
-      console.error("Error fetching employees:", error);
-    } finally {
-      setLoading(false);
+  const onFinish = useCallback((values) => {
+    
+    if (isEditing && editingEmployee) {
+      dispatch(updateEmployeeRequest(editingEmployee.id, values));
+      message.success("Cập nhật thành công!");
+    } else {
+      dispatch(createEmployeeRequest(values));
+      message.success("Thêm nhân viên thành công!");
     }
-  }, []);
 
-  const onFinish = useCallback(async (values) => {
-    try {
-      if (isEditing) {
-        await employeeService.updateEmployee(editingId, values);
-        message.success("Cập nhật thành công!");
-      } else {
-        await employeeService.createEmployee(values);
-        message.success("Thêm nhân viên thành công!");
-      }
+    form.resetFields();
+    dispatch(clearEditingEmployee());
+  }, [isEditing, editingEmployee, form, dispatch]);
 
-      form.resetFields();
-      setIsEditing(false);
-      setEditingId(null);
-      fetchEmployees(); // Refresh the list
-    } catch (error) {
-      message.error(isEditing ? "Cập nhật thất bại!" : "Thêm nhân viên thất bại!");
-      console.error("Error:", error);
-    }
-  }, [isEditing, editingId, form, fetchEmployees]);
-
-  const handleDelete = useCallback(async (id) => {
-    try {
-      await employeeService.deleteEmployee(id);
-      message.success("Đã xóa!");
-      fetchEmployees(); // Refresh the list
-    } catch (error) {
-      message.error("Xóa thất bại!");
-      console.error("Error deleting employee:", error);
-    }
-  }, [fetchEmployees]);
+  const handleDelete = useCallback((id) => {
+    dispatch(deleteEmployeeRequest(id));
+    message.success("Đã xóa!");
+  }, [dispatch]);
 
   const handleEdit = useCallback((record) => {
     form.setFieldsValue(record);
-    setEditingId(record.id);
-    setIsEditing(true);
-  }, [form]);
+    dispatch(setEditingEmployee(record));
+  }, [form, dispatch]);
 
   const ActionButtons = React.memo(({ record }) => (
     <Space>
