@@ -18,10 +18,7 @@ import {
   deleteEmployeeRequest,
   setEditingEmployee,
   clearEditingEmployee,
-  websocketConnect,
-  websocketDisconnect
 } from "./store/actions";
-import websocketService from "./services/websocket";
 
 const EmployeeManagement = React.memo(() => {
   const [form] = Form.useForm();
@@ -30,30 +27,13 @@ const EmployeeManagement = React.memo(() => {
   // Get state from Redux store
   const { employees, loading, isEditing, editingEmployee } = useSelector(state => state.employee);
 
-  // Fetch employees on component mount and setup WebSocket
+  // Fetch employees on component mount
   useEffect(() => {
     dispatch(fetchEmployeesRequest());
-    dispatch(websocketConnect());
-    
-    // Subscribe to WebSocket events
-    const unsubscribeCreated = websocketService.subscribe('employee_created', (data) => {
-      message.success('Nhân viên mới đã được thêm!');
-    });
-    
-    const unsubscribeUpdated = websocketService.subscribe('employee_updated', (data) => {
-      message.success('Thông tin nhân viên đã được cập nhật!');
-    });
-    
-    const unsubscribeDeleted = websocketService.subscribe('employee_deleted', (data) => {
-      message.success('Nhân viên đã được xóa!');
-    });
-    
+
     // Cleanup on unmount
     return () => {
-      unsubscribeCreated();
-      unsubscribeUpdated();
-      unsubscribeDeleted();
-      dispatch(websocketDisconnect());
+      // No cleanup needed
     };
   }, [dispatch]);
 
@@ -82,7 +62,7 @@ const EmployeeManagement = React.memo(() => {
   }, [form, dispatch]);
 
   const ActionButtons = React.memo(({ record }) => (
-    <Space>
+    <Space key={`actions-${record.id}`}>
       <Button type="primary" onClick={() => handleEdit(record)}>
         Sửa
       </Button>
@@ -96,14 +76,46 @@ const EmployeeManagement = React.memo(() => {
   ));
 
   const columns = useMemo(() => [
-    { title: "ID", dataIndex: "id", key: "id" },
-    { title: "Tên", dataIndex: "name", key: "name" },
-    { title: "Tuổi", dataIndex: "age", key: "age" },
-    { title: "Chức vụ", dataIndex: "position", key: "position" },
+    { 
+      title: "ID", 
+      dataIndex: "id", 
+      key: "id",
+      render: (text) => text
+    },
+    { 
+      title: "Tên", 
+      dataIndex: "name", 
+      key: "name",
+      render: (text) => text
+    },
+    { 
+      title: "Tuổi", 
+      dataIndex: "age", 
+      key: "age",
+      render: (text) => text
+    },
+    { 
+      title: "Chức vụ", 
+      dataIndex: "position", 
+      key: "position",
+      render: (text) => text
+    },
     {
       title: "Hành động",
       key: "actions",
-      render: (_, record) => <ActionButtons record={record} />,
+      render: (_, record) => (
+        <Space key={`actions-${record.id}`}>
+          <Button type="primary" onClick={() => handleEdit(record)}>
+            Sửa
+          </Button>
+          <Popconfirm
+            title="Bạn có chắc muốn xóa?"
+            onConfirm={() => handleDelete(record.id)}
+          >
+            <Button danger>Xóa</Button>
+          </Popconfirm>
+        </Space>
+      ),
     },
   ], [handleEdit, handleDelete]);
 

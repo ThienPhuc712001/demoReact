@@ -13,9 +13,6 @@ import {
   DELETE_EMPLOYEE_FAILURE,
   SET_EDITING_EMPLOYEE,
   CLEAR_EDITING_EMPLOYEE,
-  WEBSOCKET_CONNECT,
-  WEBSOCKET_DISCONNECT,
-  WEBSOCKET_MESSAGE_RECEIVED
 } from './actionTypes';
 
 // Employee actions
@@ -85,18 +82,4 @@ export const setEditingEmployee = (employee) => ({
 
 export const clearEditingEmployee = () => ({
   type: CLEAR_EDITING_EMPLOYEE
-});
-
-// WebSocket actions
-export const websocketConnect = () => ({
-  type: WEBSOCKET_CONNECT
-});
-
-export const websocketDisconnect = () => ({
-  type: WEBSOCKET_DISCONNECT
-});
-
-export const websocketMessageReceived = (message) => ({
-  type: WEBSOCKET_MESSAGE_RECEIVED,
-  payload: message
 });

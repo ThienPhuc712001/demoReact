@@ -14,9 +14,6 @@ import {
   DELETE_EMPLOYEE_FAILURE,
   SET_EDITING_EMPLOYEE,
   CLEAR_EDITING_EMPLOYEE,
-  WEBSOCKET_CONNECT,
-  WEBSOCKET_DISCONNECT,
-  WEBSOCKET_MESSAGE_RECEIVED
 } from './actionTypes';
 
 // Initial state
@@ -25,8 +22,7 @@ const initialState = {
   loading: false,
   error: null,
   isEditing: false,
-  editingEmployee: null,
-  websocketConnected: false
+  editingEmployee: null
 };
 
 // Employee reducer
@@ -129,43 +125,7 @@ const employeeReducer = (state = initialState, action) => {
         isEditing: false,
         editingEmployee: null
       };
-    
-    // WebSocket
-    case WEBSOCKET_CONNECT:
-      return {
-        ...state,
-        websocketConnected: true
-      };
-    case WEBSOCKET_DISCONNECT:
-      return {
-        ...state,
-        websocketConnected: false
-      };
-    case WEBSOCKET_MESSAGE_RECEIVED:
-      // Handle WebSocket messages based on type
-      const { type, data } = action.payload;
-      switch (type) {
-        case 'employee_created':
-          return {
-            ...state,
-            employees: [...state.employees, data]
-          };
-        case 'employee_updated':
-          return {
-            ...state,
-            employees: state.employees.map(emp =>
-              emp.id === data.id ? data : emp
-            )
-          };
-        case 'employee_deleted':
-          return {
-            ...state,
-            employees: state.employees.filter(emp => emp.id !== data.id)
-          };
-        default:
-          return state;
-      }
-    
+
     default:
       return state;
   }
